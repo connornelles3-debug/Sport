@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GameDay</title>
+<style>
+:root{--bg:#0b0d17;--card:#161a2b;--text:#f4f5fb;--muted:#9aa1bd;--accent:#e5352b;--line:#252a45;--yes:#4ade80;--mb:#fbbf24;--no:#f87171;color-scheme:dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root{--bg:#f3f4f9;--card:#fff;--text:#12141f;--muted:#5d6278;--line:#dfe2ec;--yes:#12803c;--mb:#9a6a00;--no:#b42318;color-scheme:light}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.top{display:flex;align-items:center;gap:14px;padding:14px 18px;max-width:1100px;margin:0 auto}
+.logo{font-weight:800;font-size:20px;letter-spacing:-.02em}.logo b{color:var(--accent)}.sp{flex:1}
+.nav{display:flex;align-items:center;gap:8px;font-size:14px}.nav button{padding:6px 12px}
+main{max-width:1100px;margin:0 auto;padding:0 18px 40px}
+.bar{display:flex;gap:8px;overflow-x:auto;padding:6px 0 4px}
+button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--text);padding:8px 15px;border-radius:20px;font-size:14px;font-weight:600;cursor:pointer}
+button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+h2{font-size:18px;margin:22px 0 10px}
+.rail{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+.c{flex:none;width:230px;border-radius:14px;background:var(--card);border:1px solid var(--line);overflow:hidden}
+.art{height:96px;display:flex;align-items:center;justify-content:center;gap:12px;position:relative;background:linear-gradient(135deg,#252b4d,#141830)}
+.art img{width:48px;height:48px;object-fit:contain}.ab{width:48px;height:48px;border-radius:50%;background:#ffffff22;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+.pill{position:absolute;left:8px;top:8px;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff}.pill.l{background:var(--accent)}
+.sc{position:absolute;right:8px;top:8px;font-size:12px;font-weight:700;color:#fff}
+.bd{padding:10px 12px 12px}.m{font-weight:700;font-size:14px}.n{font-size:12.5px;color:var(--muted);margin:2px 0 8px;min-height:17px}
+.s{font-size:12.5px;font-weight:700}.yes{color:var(--yes)}.maybe{color:var(--mb)}.no{color:var(--no)}.unk{color:var(--muted)}
+.note{font-size:12.5px;color:var(--muted);margin-top:22px;max-width:720px}
+</style></head><body>
+<div class="top"><div class="logo">GAME<b>DAY</b></div><div class="sp"></div>
+<div class="nav"><button id="prev">←</button><span id="dl"></span><button id="next">→</button></div></div>
+<main><div class="bar" id="bar"></div><div id="v"><p class="n">Loading games…</p></div>
+<p class="note">✅ on your services · 🟡 depends on your channel lineup · ❌ not on your services · ❔ channel not listed yet. Edit <code>api/services.js</code> to change what counts as your services. Schedule data refreshes automatically.</p></main>
+<script>
+var L={yes:["✅","You can watch"],maybe:["🟡","Maybe"],no:["❌","Not on your services"],unk:["❔","Channel not listed"]};
+var N={All:"All",NFL:"NFL",NBA:"NBA",CBB:"College basketball",CFB:"College football",MLB:"MLB"};
+var cur="All",mine=false,data=null,date=null;
+function ymd(d){return d.getFullYear()+("0"+(d.getMonth()+1)).slice(-2)+("0"+d.getDate()).slice(-2)}
+function shift(n){var s=date||data.date,d=new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6,8)+n);load(ymd(d))}
+function tm(g){return new Date(g.start).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}
+function esc(t){var d=document.createElement("div");d.textContent=t==null?"":t;return d.innerHTML}
+function logo(t){return t.logo?'<img src="'+esc(t.logo)+'" alt="">':'<div class="ab">'+esc(t.abbr)+'</div>'}
+function card(g){
+ var s=g.free?["🆓","Free to watch"]:L[g.status],lv=g.state==="in",fin=g.state==="post";
+ var pill=lv?'<span class="pill l">LIVE</span>':fin?'<span class="pill">FINAL</span>':'<span class="pill">'+tm(g)+'</span>';
+ var sc=(lv||fin)&&g.away.score!=null?'<span class="sc">'+esc(g.away.score)+' – '+esc(g.home.score)+'</span>':'';
+ return'<div class="c"><div class="art">'+pill+sc+logo(g.away)+logo(g.home)+'</div><div class="bd"><div class="m">'+esc(g.away.name)+' at '+esc(g.home.name)+'</div><div class="n">'+esc(g.networks.join(" · ")||"Channel not listed")+'</div><div class="s '+(g.free?'yes':g.status)+'">'+s[0]+' '+s[1]+'</div></div></div>'}
+function rail(t,a){return a.length?'<h2>'+t+'</h2><div class="rail">'+a.map(card).join("")+'</div>':""}
+function render(){
+ document.querySelectorAll("#bar button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.k===cur||(b.dataset.k==="mine"&&mine))});
+ var a=data.games.filter(function(g){return(cur==="All"||g.league===cur)&&(!mine||g.status==="yes"||g.status==="maybe"||g.free)});
+ var h=rail("Live now",a.filter(function(g){return g.state==="in"}));
+ h+=rail("Ready to watch",a.filter(function(g){return g.state==="pre"&&(g.status==="yes"||g.free)}));
+ ["NFL","NBA","CFB","CBB","MLB"].forEach(function(k){h+=rail(N[k]+" · all games",a.filter(function(g){return g.league===k}))});
+ if(data.errors&&data.errors.length)h+='<p class="note">Couldn’t load: '+esc(data.errors.join(", "))+'</p>';
+ document.getElementById("v").innerHTML=h||'<p class="n">No games match.</p>';
+}
+function load(d){
+ document.getElementById("v").innerHTML='<p class="n">Loading games…</p>';
+ fetch("/api/games"+(d?"?date="+d:"")).then(function(r){return r.json()}).then(function(j){
+  data=j;date=j.date;
+  var x=new Date(+j.date.slice(0,4),+j.date.slice(4,6)-1,+j.date.slice(6,8));
+  document.getElementById("dl").textContent=x.toLocaleDateString([],{weekday:"short",month:"short",day:"numeric"});
+  render();
+ }).catch(function(){document.getElementById("v").innerHTML='<p class="n">Couldn’t load games. Try again in a minute.</p>'});
+}
+var bar=document.getElementById("bar");
+Object.keys(N).concat(["mine"]).forEach(function(k){var b=document.createElement("button");b.dataset.k=k;b.textContent=k==="mine"?"My services only":N[k];b.onclick=function(){if(k==="mine")mine=!mine;else cur=k;if(data)render()};bar.appendChild(b)});
+document.getElementById("prev").onclick=function(){shift(-1)};document.getElementById("next").onclick=function(){shift(1)};
+load();setInterval(function(){if(!document.hidden)load(date)},120000);
+</script></body></html>
